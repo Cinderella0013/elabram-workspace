@@ -1,8 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Calendar from 'react-calendar';
+import Papa from 'papaparse';
+import { Calendar as CalendarIcon, ClipboardList, CheckCircle2 } from 'lucide-react';
+import 'react-calendar/dist/Calendar.css';
+
+// URL CSV จาก Google Sheet (Publish to Web)
+const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS6grModf5pKXT9su90vRzpRNtVL-oN71zPWZLlzY9V_BAtvh6IKw8e_oq9NPm787CjKf6f9Wr-hPOP/pub?gid=144768523&single=true&output=csv';
 
 export default function LandingPage() {
+  // State ของฟอร์มเดิม
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -17,8 +25,28 @@ export default function LandingPage() {
   const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [isCaptchaValid, setIsCaptchaValid] = useState(false);
 
+  // State สำหรับปฏิทินและ Google Sheet
+  const [bookedData, setBookedData] = useState<any[]>([]);
+  const [isSheetLoading, setIsSheetLoading] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(new Date());
+
+  // ดึงข้อมูล Captcha
   useEffect(() => {
     generateCaptcha();
+  }, []);
+
+  // ดึงข้อมูลการจองจาก Google Sheet
+  useEffect(() => {
+    setIsSheetLoading(true);
+    Papa.parse(GOOGLE_SHEET_CSV_URL, {
+      download: true,
+      header: true,
+      complete: (results) => {
+        const validData = results.data.filter((row: any) => row['Start Date']);
+        setBookedData(validData);
+        setIsSheetLoading(false);
+      },
+    });
   }, []);
 
   const generateCaptcha = () => {
@@ -63,6 +91,15 @@ export default function LandingPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // เมื่อกดเลือกวันที่บนปฏิทิน ให้อัปเดตช่อง Start Date ในฟอร์มด้วย
+  const handleDateSelection = (newDate: any) => {
+    setCalendarDate(newDate);
+    const year = newDate.getFullYear();
+    const month = String(newDate.getMonth() + 1).padStart(2, '0');
+    const day = String(newDate.getDate()).padStart(2, '0');
+    setStartDate(`${year}-${month}-${day}`); // อัปเดต State ฟอร์ม
   };
 
   return (
@@ -117,7 +154,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 2. Pricing & Plans (UPDATED: Hover to highlight only) */}
+      {/* 2. Pricing & Plans */}
       <section id="pricing" className="py-24 px-4 max-w-[90rem] mx-auto scroll-mt-20">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-4 tracking-tight">Flexible <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Workspace Plans</span></h2>
@@ -127,72 +164,178 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           
           {/* Card 1 */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl hover:border-cyan-500/50 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(6,182,212,0.15)] transition-all duration-300 group flex flex-col overflow-hidden">
-            <div className="h-40 bg-[url('https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"></div>
+          <div className={`bg-slate-900 border ${plan === 'Hot Desk - Day Pass (RM 30)' ? 'border-cyan-500 shadow-[0_0_30px_rgba(6,182,212,0.15)]' : 'border-slate-800'} rounded-2xl hover:border-cyan-500/50 hover:-translate-y-1 transition-all duration-300 group flex flex-col overflow-hidden`}>
+            <div className="h-40 bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" style={{ backgroundImage: "url('/images/hot-desk-monthly.jpg')" }}></div>
             <div className="p-6 flex flex-col flex-grow bg-slate-900 z-10 relative">
               <h3 className="text-3xl font-extrabold text-white mb-1 group-hover:text-cyan-400 transition-colors">RM 30</h3>
               <p className="text-xs text-slate-500 font-medium mb-6 uppercase tracking-wider min-h-[32px]">Per Day</p>
               <h4 className="text-base font-semibold text-slate-300 group-hover:text-white mb-8 transition-colors">Hot Desk – Day Pass</h4>
-              <a href="#booking" onClick={() => setPlan('Hot Desk - Day Pass (RM 30)')} className="mt-auto block text-center w-full py-3 bg-slate-800 text-slate-400 rounded-xl font-medium text-sm group-hover:bg-cyan-500 group-hover:text-white transition-all">
-                Select Plan
+              <a href="#availability-section" onClick={(e) => setPlan('Hot Desk - Day Pass (RM 30)')} className={`mt-auto block text-center w-full py-3 rounded-xl font-medium text-sm transition-all ${plan === 'Hot Desk - Day Pass (RM 30)' ? 'bg-cyan-500 text-white' : 'bg-slate-800 text-slate-400 group-hover:bg-cyan-500 group-hover:text-white'}`}>
+                {plan === 'Hot Desk - Day Pass (RM 30)' ? 'Selected' : 'Select Plan'}
               </a>
             </div>
           </div>
 
           {/* Card 2 (Popular) */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl hover:border-blue-500/50 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(59,130,246,0.3)] transition-all duration-300 group flex flex-col relative overflow-hidden">
+          <div className={`bg-slate-900 border ${plan === 'Hot Desk - Monthly (RM 388)' ? 'border-blue-500 shadow-[0_0_40px_rgba(59,130,246,0.3)]' : 'border-slate-800'} rounded-2xl hover:border-blue-500/50 hover:-translate-y-1 transition-all duration-300 group flex flex-col relative overflow-hidden`}>
             <div className="absolute top-4 right-4 z-20 bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-cyan-500 group-hover:text-white group-hover:border-transparent transition-all">Popular</div>
-            <div className="h-40 bg-[url('https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"></div>
+            <div className="h-40 bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" style={{ backgroundImage: "url('/images/hot-desk-monthly.jpg')" }}></div>
             <div className="p-6 flex flex-col flex-grow bg-slate-900 z-10 relative">
               <h3 className="text-3xl font-extrabold text-white mb-1 group-hover:text-blue-400 transition-colors">RM 388</h3>
               <p className="text-xs text-slate-500 font-medium mb-6 uppercase tracking-wider min-h-[32px]">Weekday (Excl. Holidays)</p>
               <h4 className="text-base font-semibold text-slate-300 group-hover:text-white mb-8 transition-colors">Hot Desk – Monthly</h4>
-              <a href="#booking" onClick={() => setPlan('Hot Desk - Monthly (RM 388)')} className="mt-auto block text-center w-full py-3 bg-slate-800 text-slate-400 rounded-xl font-semibold text-sm group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-cyan-500 group-hover:text-white transition-all">
-                Select Plan
+              <a href="#availability-section" onClick={(e) => setPlan('Hot Desk - Monthly (RM 388)')} className={`mt-auto block text-center w-full py-3 rounded-xl font-semibold text-sm transition-all ${plan === 'Hot Desk - Monthly (RM 388)' ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white' : 'bg-slate-800 text-slate-400 group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-cyan-500 group-hover:text-white'}`}>
+                {plan === 'Hot Desk - Monthly (RM 388)' ? 'Selected' : 'Select Plan'}
               </a>
             </div>
           </div>
 
           {/* Card 3 (Best Value) */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl hover:border-cyan-500/50 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(6,182,212,0.15)] transition-all duration-300 group flex flex-col relative overflow-hidden">
+          <div className={`bg-slate-900 border ${plan === 'Team Bundle (RM 1,800)' ? 'border-cyan-500 shadow-[0_0_30px_rgba(6,182,212,0.15)]' : 'border-slate-800'} rounded-2xl hover:border-cyan-500/50 hover:-translate-y-1 transition-all duration-300 group flex flex-col relative overflow-hidden`}>
             <div className="absolute top-4 right-4 z-20 bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider group-hover:bg-cyan-500 group-hover:text-white group-hover:border-transparent transition-all">Best Value</div>
-            <div className="h-40 bg-[url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"></div>
+            <div className="h-40 bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" style={{ backgroundImage: "url('/images/team-bundle.jpg')" }}></div>
             <div className="p-6 flex flex-col flex-grow bg-slate-900 z-10 relative">
               <h3 className="text-3xl font-extrabold text-white mb-1 group-hover:text-cyan-400 transition-colors">RM 1,800</h3>
               <p className="text-xs text-slate-500 font-medium mb-6 uppercase tracking-wider min-h-[32px]">Monthly</p>
               <h4 className="text-base font-semibold text-slate-300 group-hover:text-white mb-8 transition-colors">Team Bundle (up to 5 pax)</h4>
-              <a href="#booking" onClick={() => setPlan('Team Bundle (RM 1,800)')} className="mt-auto block text-center w-full py-3 bg-slate-800 text-slate-400 rounded-xl font-medium text-sm group-hover:bg-cyan-500 group-hover:text-white transition-all">
-                Select Plan
+              <a href="#availability-section" onClick={(e) => setPlan('Team Bundle (RM 1,800)')} className={`mt-auto block text-center w-full py-3 rounded-xl font-medium text-sm transition-all ${plan === 'Team Bundle (RM 1,800)' ? 'bg-cyan-500 text-white' : 'bg-slate-800 text-slate-400 group-hover:bg-cyan-500 group-hover:text-white'}`}>
+                {plan === 'Team Bundle (RM 1,800)' ? 'Selected' : 'Select Plan'}
               </a>
             </div>
           </div>
 
-          {/* Card 4 */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl hover:border-cyan-500/50 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(6,182,212,0.15)] transition-all duration-300 group flex flex-col overflow-hidden">
-            <div className="h-40 bg-[url('https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"></div>
+          {/* Card 4 - Cubicle Day Pass */}
+          <div className={`bg-slate-900 border ${plan === 'Cubicle - Day Pass (RM 80)' ? 'border-cyan-500 shadow-[0_0_30px_rgba(6,182,212,0.15)]' : 'border-slate-800'} rounded-2xl hover:border-cyan-500/50 hover:-translate-y-1 transition-all duration-300 group flex flex-col overflow-hidden`}>
+            <div className="h-40 bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" style={{ backgroundImage: "url('/images/cubicle-day-pass.jpg')" }}></div>
             <div className="p-6 flex flex-col flex-grow bg-slate-900 z-10 relative">
               <h3 className="text-3xl font-extrabold text-white mb-1 group-hover:text-cyan-400 transition-colors">RM 80</h3>
               <p className="text-xs text-slate-500 font-medium mb-6 uppercase tracking-wider min-h-[32px]">Per Day</p>
               <h4 className="text-base font-semibold text-slate-300 group-hover:text-white mb-8 transition-colors">Cubicle – Day Pass</h4>
-              <a href="#booking" onClick={() => setPlan('Cubicle - Day Pass (RM 80)')} className="mt-auto block text-center w-full py-3 bg-slate-800 text-slate-400 rounded-xl font-medium text-sm group-hover:bg-cyan-500 group-hover:text-white transition-all">
-                Select Plan
+              <a href="#availability-section" onClick={(e) => setPlan('Cubicle - Day Pass (RM 80)')} className={`mt-auto block text-center w-full py-3 rounded-xl font-medium text-sm transition-all ${plan === 'Cubicle - Day Pass (RM 80)' ? 'bg-cyan-500 text-white' : 'bg-slate-800 text-slate-400 group-hover:bg-cyan-500 group-hover:text-white'}`}>
+                {plan === 'Cubicle - Day Pass (RM 80)' ? 'Selected' : 'Select Plan'}
               </a>
             </div>
           </div>
 
-          {/* Card 5 */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl hover:border-cyan-500/50 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(6,182,212,0.15)] transition-all duration-300 group flex flex-col overflow-hidden">
-            <div className="h-40 bg-[url('https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"></div>
+          {/* Card 5 - Cubicle Monthly */}
+          <div className={`bg-slate-900 border ${plan === 'Cubicle - Monthly (RM 588)' ? 'border-cyan-500 shadow-[0_0_30px_rgba(6,182,212,0.15)]' : 'border-slate-800'} rounded-2xl hover:border-cyan-500/50 hover:-translate-y-1 transition-all duration-300 group flex flex-col overflow-hidden`}>
+            <div className="h-40 bg-cover bg-center opacity-40 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" style={{ backgroundImage: "url('/images/cubicle-day-pass.jpg')" }}></div>
             <div className="p-6 flex flex-col flex-grow bg-slate-900 z-10 relative">
               <h3 className="text-3xl font-extrabold text-white mb-1 group-hover:text-cyan-400 transition-colors">RM 588</h3>
               <p className="text-xs text-slate-500 font-medium mb-6 uppercase tracking-wider min-h-[32px]">Weekday (Excl. Holidays)</p>
               <h4 className="text-base font-semibold text-slate-300 group-hover:text-white mb-8 transition-colors">Cubicle – Monthly</h4>
-              <a href="#booking" onClick={() => setPlan('Cubicle - Monthly (RM 588)')} className="mt-auto block text-center w-full py-3 bg-slate-800 text-slate-400 rounded-xl font-medium text-sm group-hover:bg-cyan-500 group-hover:text-white transition-all">
-                Select Plan
+              <a href="#availability-section" onClick={(e) => setPlan('Cubicle - Monthly (RM 588)')} className={`mt-auto block text-center w-full py-3 rounded-xl font-medium text-sm transition-all ${plan === 'Cubicle - Monthly (RM 588)' ? 'bg-cyan-500 text-white' : 'bg-slate-800 text-slate-400 group-hover:bg-cyan-500 group-hover:text-white'}`}>
+                {plan === 'Cubicle - Monthly (RM 588)' ? 'Selected' : 'Select Plan'}
               </a>
             </div>
           </div>
 
+        </div>
+
+        {/* --- ส่วนที่แก้ไขใหม่: ตารางวันที่และปฏิทิน (Availability Section) --- */}
+        <div id="availability-section" className="mt-16 pt-16 border-t border-slate-800 scroll-mt-20">
+          <div className="text-center mb-10">
+            <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">Workspace <span className="text-cyan-400">Schedule</span></h3>
+            <p className="text-slate-400 text-sm">ตรวจสอบคิวการใช้งานและสถานะการจองทั้งหมด</p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+            
+            {/* ฝั่งซ้าย: ปฏิทินเลือกวัน */}
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-lg">
+              <div className="flex items-center gap-2 mb-6">
+                <CalendarIcon className="text-cyan-400 w-5 h-5" />
+                <h3 className="text-lg font-bold text-white">Select Booking Date</h3>
+              </div>
+              <div className="bg-white p-4 rounded-2xl shadow-inner">
+                <Calendar 
+                  onChange={handleDateSelection} 
+                  value={calendarDate} 
+                  tileDisabled={({date, view}) => view === 'month' && date.getTime() < new Date().setHours(0,0,0,0)}
+                  tileClassName={({ date, view }) => {
+                    if (view === 'month') {
+                      const dateStr = date.toDateString();
+                      // เช็คว่าวันนั้นมีการจองที่สถานะ Confirmed ของแพลนที่กำลังเลือกอยู่หรือไม่
+                      const isConfirmed = bookedData.some(row => 
+                        new Date(row['Start Date']).toDateString() === dateStr && 
+                        row['Status'] === 'Approved' && 
+                        row['Select Plan'] === plan
+                      );
+                      return isConfirmed ? 'bg-red-100 text-red-600 font-bold rounded-lg' : null;
+                    }
+                    return null;
+                  }}
+                  className="w-full border-none rounded-lg text-slate-900 font-sans"
+                />
+              </div>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-xs">
+                <div className="flex items-center gap-2"><div className="w-3 h-3 bg-white border border-slate-300 rounded-sm"></div> <span className="text-slate-400">ว่าง (Available)</span></div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-100 border border-red-200 rounded-sm"></div> <span className="text-red-400">มีการจองแล้ว (Booked)</span></div>
+              </div>
+            </div>
+
+            {/* ฝั่งขวา: ตารางแสดงรายการจองทั้งหมด (Master Table) */}
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-lg flex flex-col">
+              <div className="flex items-center gap-2 mb-6">
+                <ClipboardList className="text-cyan-400 w-5 h-5" />
+                <h3 className="text-lg font-bold text-white">Booking Status List</h3>
+              </div>
+              
+              <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950 flex-grow">
+                <table className="w-full text-left text-[13px]">
+                  <thead className="bg-slate-800/80 text-slate-300">
+                    <tr>
+                      <th className="p-4 font-semibold">Date</th>
+                      <th className="p-4 font-semibold">Workspace / Plan</th>
+                      <th className="p-4 font-semibold">Time</th>
+                      <th className="p-4 font-semibold text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {isSheetLoading ? (
+                      <tr><td colSpan={4} className="p-8 text-center text-cyan-400 animate-pulse">กำลังโหลดข้อมูลจากระบบ...</td></tr>
+                    ) : bookedData.length > 0 ? (
+                      // แสดงรายการจองล่าสุด 15 รายการ
+                      bookedData.slice(0, 15).map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-900/50 transition-colors">
+                          <td className="p-4 text-slate-400 whitespace-nowrap">
+                            {new Date(row['Start Date']).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' })}
+                          </td>
+                          <td className="p-4">
+                            <div className="text-white font-medium">{row['Select Plan']}</div>
+                          </td>
+                          <td className="p-4 text-slate-400">
+                            {row['Expected Time'] || row['Time Slot'] || '-'}
+                          </td>
+                          <td className="p-4">
+                            <div className="flex justify-center">
+                              {row['Status'] === 'Approved' ? (
+                                <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-400/10 px-2 py-1 rounded-full border border-emerald-400/20">
+                                  <CheckCircle2 size={10} /> CONFIRMED
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-[10px] text-amber-400 font-bold bg-amber-400/10 px-2 py-1 rounded-full border border-amber-400/20">
+                                  <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></span> WAIT
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="p-8 text-center text-slate-500 italic">ไม่มีรายการจองในขณะนี้</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              <p className="mt-4 text-[11px] text-slate-500 text-center">
+                * หากสถานะเป็น <strong>Wait</strong> คุณยังสามารถส่งคำขอจองทับในช่วงเวลาเดียวกันได้เพื่อรอการตรวจสอบคิว
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -340,6 +483,7 @@ export default function LandingPage() {
               </button>
             </form>
           </div>
+          
 
           <div id="location" className="bg-slate-950 lg:w-2/5 p-10 lg:p-16 border-l border-slate-800 flex flex-col justify-between scroll-mt-20">
             <div>
